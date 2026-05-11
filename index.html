@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TechSolutions</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, where, onSnapshot, serverTimestamp, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAFZfVWulELRGOz0ylAeoV9ui9NRqu9p9E",
+  authDomain: "techsolutions-app.firebaseapp.com",
+  projectId: "techsolutions-app",
+  storageBucket: "techsolutions-app.firebasestorage.app",
+  messagingSenderId: "895032135228",
+  appId: "1:895032135228:web:87cd58e34f24f936f17d39"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+window.__fb = { auth, db, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, where, onSnapshot, serverTimestamp, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut, onAuthStateChanged, orderBy };
+
+// Boot
+onAuthStateChanged(auth, async user => {
+  if (user) {
+    const snap = await getDoc(doc(db, 'usuarios', user.uid));
+    const data = snap.exists() ? snap.data() : null;
+    const rol = data?.rol || 'cliente';
+    window.__currentUser = { uid: user.uid, ...data };
+    showDashboard(rol, user.uid);
+  } else {
+    window.__currentUser = null;
+    showLogin();
+  }
+});
+</script>
+
+<style>
+:root {
+  --bg: #0b0f1a;
+  --surface: #111827;
+  --surface2: #1a2235;
+  --border: #1e2d42;
+  --accent: #3b82f6;
+  --accent2: #6366f1;
+  --green: #10b981;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --card: #141d2e;
+  --radius: 14px;
+  font-size: 15px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+h1,h2,h3,h4 { font-family: 'Syne', sans-serif; }
+
+/* LOADER */
+#loader { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:9999; flex-direction:column; gap:16px; }
+.spinner { width:42px; height:42px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* LOGIN */
+#login-page { display:none; min-height:100vh; align-items:center; justify-content:center; background:var(--bg); padding:20px; position:relative; overflow:hidden; }
+#login-page::before { content:''; position:absolute; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle, rgba(59,130,246,.15) 0%, transparent 70%); top:-100px; right:-100px; pointer-events:none; }
+#login-page::after { content:''; position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(99,102,241,.1) 0%, transparent 70%); bottom:-50px; left:-50px; pointer-events:none; }
+.login-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:48px 40px; width:100%; max-width:440px; position:relative; z-index:1; }
+.login-logo { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; margin-bottom:6px; background:linear-gradient(135deg,#3b82f6,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.login-sub { color:var(--muted); font-size:14px; margin-bottom:36px; }
+.field { margin-bottom:18px; }
+.field label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+.field input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; color:var(--text); font-size:14px; outline:none; transition:border-color .2s; font-family:inherit; }
+.field input:focus { border-color:var(--accent); }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 22px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; border:none; transition:all .2s; font-family:inherit; width:100%; }
+.btn-primary { background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff; }
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+.btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+.btn-sm { padding:7px 14px; font-size:13px; border-radius:8px; width:auto; }
+.btn-danger { background:rgba(239,68,68,.12); color:var(--red); border:1px solid rgba(239,68,68,.3); }
+.btn-danger:hover { background:rgba(239,68,68,.2); }
+.btn-success { background:rgba(16,185,129,.12); color:var(--green); border:1px solid rgba(16,185,129,.3); }
+.btn-success:hover { background:rgba(16,185,129,.2); }
+.login-toggle { display:flex; gap:8px; margin-bottom:28px; }
+.toggle-btn { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; font-family:inherit; font-size:14px; transition:all .2s; }
+.toggle-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.error-msg { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#fca5a5; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; display:none; }
+
+/* LAYOUT */
+#app { display:none; min-height:100vh; }
+.sidebar { position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:100; }
+.sidebar-logo { padding:24px 20px 20px; border-bottom:1px solid var(--border); }
+.sidebar-logo .brand { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; background:linear-gradient(135deg,#3b82f6,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.sidebar-logo .role-badge { margin-top:6px; font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; display:inline-block; text-transform:uppercase; letter-spacing:.5px; }
+.badge-admin { background:rgba(239,68,68,.15); color:#fca5a5; }
+.badge-trabajador { background:rgba(245,158,11,.15); color:#fcd34d; }
+.badge-cliente { background:rgba(59,130,246,.15); color:#93c5fd; }
+.nav-menu { flex:1; padding:16px 10px; overflow-y:auto; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; cursor:pointer; color:var(--muted); font-size:14px; font-weight:500; transition:all .2s; margin-bottom:2px; }
+.nav-item:hover { background:var(--surface2); color:var(--text); }
+.nav-item.active { background:rgba(59,130,246,.15); color:var(--accent); }
+.nav-item svg { width:18px; height:18px; flex-shrink:0; }
+.sidebar-footer { padding:16px 10px; border-top:1px solid var(--border); }
+.user-info { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; margin-bottom:8px; }
+.avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#3b82f6,#6366f1); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0; }
+.user-name { font-size:13px; font-weight:600; color:var(--text); }
+.user-email { font-size:11px; color:var(--muted); }
+.main { margin-left:240px; padding:32px; min-height:100vh; }
+.page { display:none; }
+.page.active { display:block; }
+.page-header { margin-bottom:28px; }
+.page-title { font-size:28px; font-weight:800; margin-bottom:4px; }
+.page-sub { color:var(--muted); font-size:14px; }
+
+/* CARDS & STATS */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.stat-num { font-size:32px; font-weight:800; font-family:'Syne',sans-serif; margin-bottom:4px; }
+.stat-label { font-size:13px; color:var(--muted); }
+.stat-blue .stat-num { color:var(--accent); }
+.stat-green .stat-num { color:var(--green); }
+.stat-orange .stat-num { color:var(--orange); }
+.stat-red .stat-num { color:var(--red); }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; }
+.card-title { font-size:16px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; padding:10px 14px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--border); }
+td { padding:12px 14px; font-size:14px; border-bottom:1px solid rgba(30,45,66,.5); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(59,130,246,.04); }
+
+/* BADGES */
+.badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-green { background:rgba(16,185,129,.15); color:#6ee7b7; }
+.badge-orange { background:rgba(245,158,11,.15); color:#fcd34d; }
+.badge-grey { background:rgba(100,116,139,.15); color:#94a3b8; }
+.badge-blue { background:rgba(59,130,246,.15); color:#93c5fd; }
+.badge-red { background:rgba(239,68,68,.15); color:#fca5a5; }
+.badge-purple { background:rgba(99,102,241,.15); color:#a5b4fc; }
+
+/* PROGRESS */
+.progress-bar { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .4s ease; }
+.progress-fill.complete { background:linear-gradient(90deg,var(--green),#34d399); }
+
+/* FORM */
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.field-inline { margin-bottom:16px; }
+.field-inline label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+.field-inline input, .field-inline select, .field-inline textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text); font-size:14px; outline:none; transition:border-color .2s; font-family:inherit; }
+.field-inline input:focus, .field-inline select:focus { border-color:var(--accent); }
+select option { background:var(--surface2); }
+.form-actions { display:flex; gap:10px; margin-top:20px; }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:32px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; animation:slideUp .2s ease; }
+@keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+.modal-title { font-size:20px; font-weight:700; margin-bottom:24px; }
+.modal-close { position:absolute; top:16px; right:16px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; }
+
+/* TASK CARDS */
+.task-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:10px; display:flex; align-items:flex-start; gap:14px; }
+.task-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.task-check.done { background:var(--green); border-color:var(--green); }
+.task-info { flex:1; }
+.task-name { font-weight:600; font-size:14px; margin-bottom:6px; }
+.task-name.done { text-decoration:line-through; color:var(--muted); }
+.task-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.task-actions { display:flex; gap:6px; }
+
+/* PROJECT CARD */
+.project-card { background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:12px; cursor:pointer; transition:all .2s; }
+.project-card:hover { border-color:var(--accent); transform:translateY(-1px); }
+.project-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px; }
+.project-name { font-weight:700; font-size:16px; margin-bottom:4px; }
+.project-desc { font-size:13px; color:var(--muted); }
+.project-footer { display:flex; align-items:center; justify-content:space-between; margin-top:12px; }
+.progress-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; }
+
+/* CHART */
+.chart-wrap { position:relative; height:220px; }
+
+/* CLIENT VIEW */
+.client-project { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
+.client-project-header { padding:20px 24px; background:var(--surface2); border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+.client-project-body { padding:24px; }
+
+/* NOTIFICATION */
+.notif { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 18px; font-size:14px; z-index:9999; animation:fadeIn .3s ease; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+.notif.success { border-color:rgba(16,185,129,.4); color:var(--green); }
+.notif.error { border-color:rgba(239,68,68,.4); color:#fca5a5; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* RESPONSIVE */
+@media (max-width:768px) {
+  .sidebar { transform:translateX(-100%); transition:transform .3s; }
+  .sidebar.open { transform:none; }
+  .main { margin-left:0; padding:20px; }
+  .grid-2 { grid-template-columns:1fr; }
+  .form-row { grid-template-columns:1fr; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
+}
+
+/* HAMBURGER */
+.hamburger { display:none; position:fixed; top:16px; left:16px; z-index:101; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer; }
+@media (max-width:768px) { .hamburger { display:flex; } }
+
+.divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+.empty-state { text-align:center; padding:48px 20px; color:var(--muted); }
+.empty-state svg { width:48px; height:48px; margin-bottom:12px; opacity:.4; }
+
+/* SECTION LABEL */
+.section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:20px 0 10px; }
+
+/* PIE CHART */
+.pie-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
+.pie-legend-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+.pie-dot { width:10px; height:10px; border-radius:50%; }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="spinner"></div>
+  <span style="color:var(--muted);font-size:14px;">Cargando TechSolutions...</span>
+</div>
+
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="login-logo">TechSolutions</div>
+    <div class="login-sub">Plataforma de gestión de proyectos</div>
+    <div class="login-toggle">
+      <button class="toggle-btn active" onclick="setMode('login')" id="tab-login">Iniciar sesión</button>
+      <button class="toggle-btn" onclick="setMode('register')" id="tab-register">Registrarse</button>
+    </div>
+    <div id="login-error" class="error-msg"></div>
+    <div id="register-fields" style="display:none">
+      <div class="field"><label>Nombre completo</label><input id="inp-nombre" type="text" placeholder="Tu nombre"/></div>
+    </div>
+    <div class="field"><label>Correo electrónico</label><input id="inp-correo" type="email" placeholder="correo@ejemplo.com"/></div>
+    <div class="field"><label>Contraseña</label><input id="inp-pass" type="password" placeholder="••••••••"/></div>
+    <button class="btn btn-primary" onclick="doAuth()" id="auth-btn">Iniciar sesión</button>
+  </div>
+</div>
+
+<!-- HAMBURGER -->
+<button class="hamburger" onclick="toggleSidebar()" id="hamburger">
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+</button>
+
+<!-- APP -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">TechSolutions</div>
+      <span id="role-badge" class="role-badge"></span>
+    </div>
+    <nav class="nav-menu" id="nav-menu"></nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="avatar" id="user-avatar">?</div>
+        <div>
+          <div class="user-name" id="user-name-label">–</div>
+          <div class="user-email" id="user-email-label">–</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" onclick="doLogout()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        Cerrar sesión
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <!-- ADMIN PAGES -->
+    <div id="page-admin-dash" class="page">
+      <div class="page-header">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Vista general del sistema</div>
+      </div>
+      <div class="stats-grid" id="admin-stats"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            Estado de tareas
+          </div>
+          <div class="chart-wrap"><canvas id="chart-tareas"></canvas></div>
+          <div class="pie-legend" id="chart-tareas-legend"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--accent2)" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Proyectos recientes
+          </div>
+          <div id="dash-proyectos-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-admin-usuarios" class="page">
+      <div class="page-header">
+        <div class="page-title">Usuarios</div>
+        <div class="page-sub">Gestión de cuentas y roles</div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Acciones</th></tr></thead>
+            <tbody id="usuarios-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-admin-proyectos" class="page">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="page-title">Proyectos</div>
+          <div class="page-sub">Administra todos los proyectos</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-proyecto')">+ Nuevo proyecto</button>
+      </div>
+      <div id="proyectos-list"></div>
+    </div>
+
+    <div id="page-admin-reportes" class="page">
+      <div class="page-header">
+        <div class="page-title">Reportes</div>
+        <div class="page-sub">Genera reportes en PDF</div>
+      </div>
+      <div id="reportes-content"></div>
+    </div>
+
+    <!-- TRABAJADOR PAGES -->
+    <div id="page-worker-tareas" class="page">
+      <div class="page-header">
+        <div class="page-title">Mis Tareas</div>
+        <div class="page-sub">Tareas asignadas a ti</div>
+      </div>
+      <div id="worker-tareas-list"></div>
+    </div>
+
+    <!-- CLIENTE PAGES -->
+    <div id="page-client-proyectos" class="page">
+      <div class="page-header">
+        <div class="page-title">Mis Proyectos</div>
+        <div class="page-sub">Estado de tus proyectos</div>
+      </div>
+      <div id="client-proyectos-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROYECTO -->
+<div class="modal-overlay" id="modal-proyecto">
+  <div class="modal" style="position:relative">
+    <h3 class="modal-title" id="modal-proyecto-title">Nuevo Proyecto</h3>
+    <input type="hidden" id="proyecto-edit-id"/>
+    <div class="form-row">
+      <div class="field-inline">
+        <label>Nombre del proyecto *</label>
+        <input id="p-nombre" type="text" placeholder="Ej. App móvil"/>
+      </div>
+      <div class="field-inline">
+        <label>Estado</label>
+        <select id="p-estado">
+          <option value="activo">Activo</option>
+          <option value="en progreso">En progreso</option>
+          <option value="completado">Completado</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-inline">
+      <label>Descripción</label>
+      <input id="p-desc" type="text" placeholder="Descripción breve"/>
+    </div>
+    <div class="field-inline">
+      <label>Cliente</label>
+      <select id="p-cliente"><option value="">Sin asignar</option></select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-proyecto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarProyecto()">Guardar proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAREA -->
+<div class="modal-overlay" id="modal-tarea">
+  <div class="modal" style="position:relative">
+    <h3 class="modal-title" id="modal-tarea-title">Nueva Tarea</h3>
+    <input type="hidden" id="tarea-edit-id"/>
+    <input type="hidden" id="tarea-proyecto-id"/>
+    <div class="field-inline">
+      <label>Nombre de la tarea *</label>
+      <input id="t-nombre" type="text" placeholder="Ej. Diseño de UI"/>
+    </div>
+    <div class="form-row">
+      <div class="field-inline">
+        <label>Prioridad</label>
+        <select id="t-prioridad">
+          <option value="alta">Alta</option>
+          <option value="media" selected>Media</option>
+          <option value="baja">Baja</option>
+        </select>
+      </div>
+      <div class="field-inline">
+        <label>Estado</label>
+        <select id="t-estado">
+          <option value="pendiente">Pendiente</option>
+          <option value="en progreso">En progreso</option>
+          <option value="completada">Completada</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-inline">
+      <label>Asignar trabajador</label>
+      <select id="t-trabajador"><option value="">Sin asignar</option></select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-tarea')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTarea()">Guardar tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIAR ROL -->
+<div class="modal-overlay" id="modal-rol">
+  <div class="modal" style="position:relative;max-width:360px">
+    <h3 class="modal-title">Cambiar rol</h3>
+    <input type="hidden" id="rol-uid"/>
+    <div id="rol-options"></div>
+    <div style="margin-top:20px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-rol')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAREAS DEL PROYECTO (ADMIN) -->
+<div class="modal-overlay" id="modal-project-tasks">
+  <div class="modal" style="position:relative;max-width:700px">
+    <h3 class="modal-title" id="mpt-title">Tareas del proyecto</h3>
+    <div id="mpt-progress" style="margin-bottom:20px"></div>
+    <div id="mpt-body"></div>
+    <div style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn btn-primary btn-sm" onclick="openNewTareaModal(document.getElementById('mpt-pid').value, document.getElementById('mpt-title').textContent)">+ Nueva tarea</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-project-tasks')">Cerrar</button>
+    </div>
+    <input type="hidden" id="mpt-pid"/>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+let _unsubs = [];
+let _chartTareas = null;
+let _currentRole = null;
+
+function $(id) { return document.getElementById(id); }
+function show(id) { $(id).style.display = 'flex'; }
+function hide(id) { $(id).style.display = 'none'; }
+
+function notify(msg, type='success') {
+  const n = document.createElement('div');
+  n.className = `notif ${type}`;
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 3000);
+}
+
+function openModal(id) { $(id).classList.add('open'); }
+function closeModal(id) { $(id).classList.remove('open'); }
+
+function rolBadge(rol) {
+  const map = { admin:'badge-red', trabajador:'badge-orange', cliente:'badge-blue' };
+  const labels = { admin:'Admin', trabajador:'Trabajador', cliente:'Cliente' };
+  return `<span class="badge ${map[rol]||'badge-grey'}">${labels[rol]||rol}</span>`;
+}
+
+function estadoBadge(e) {
+  const map = { completada:'badge-green', completado:'badge-green', 'en progreso':'badge-orange', activo:'badge-blue', pendiente:'badge-grey' };
+  return `<span class="badge ${map[e]||'badge-grey'}">${e}</span>`;
+}
+
+function prioBadge(p) {
+  const map = { alta:'badge-red', media:'badge-orange', baja:'badge-green' };
+  return `<span class="badge ${map[p]||'badge-grey'}">${p}</span>`;
+}
+
+function progressBar(pct) {
+  return `<div class="progress-bar"><div class="progress-fill ${pct>=100?'complete':''}" style="width:${pct}%"></div></div>`;
+}
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+let _authMode = 'login';
+function setMode(m) {
+  _authMode = m;
+  $('tab-login').classList.toggle('active', m==='login');
+  $('tab-register').classList.toggle('active', m==='register');
+  $('register-fields').style.display = m==='register' ? 'block' : 'none';
+  $('auth-btn').textContent = m==='login' ? 'Iniciar sesión' : 'Crear cuenta';
+}
+
+async function doAuth() {
+  const { auth, db, collection, doc, getDoc, addDoc, createUserWithEmailAndPassword,
+    signInWithEmailAndPassword, serverTimestamp } = window.__fb;
+  const correo = $('inp-correo').value.trim();
+  const pass = $('inp-pass').value.trim();
+  const errEl = $('login-error');
+  errEl.style.display = 'none';
+  if (!correo || !pass) { errEl.textContent='Completa todos los campos'; errEl.style.display='block'; return; }
+
+  try {
+    if (_authMode === 'login') {
+      await signInWithEmailAndPassword(auth, correo, pass);
+    } else {
+      const nombre = $('inp-nombre').value.trim();
+      if (!nombre) { errEl.textContent='Ingresa tu nombre'; errEl.style.display='block'; return; }
+      const cred = await createUserWithEmailAndPassword(auth, correo, pass);
+      const uid = cred.user.uid;
+      const clienteRef = await addDoc(collection(db,'clientes'), {
+        nombre, correo, telefono:'', empresa:'', estado:'activo', creadoEn: serverTimestamp()
+      });
+      const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      await setDoc(doc(db,'usuarios',uid), {
+        correo, nombre, rol:'cliente', cliente_id: clienteRef.id, creadoEn: serverTimestamp()
+      });
+    }
+  } catch(e) {
+    errEl.textContent = e.message.replace('Firebase: ','').replace(/\(.*\)/,'');
+    errEl.style.display = 'block';
+  }
+}
+
+async function doLogout() {
+  _unsubs.forEach(u => u && u());
+  _unsubs = [];
+  await window.__fb.signOut(window.__fb.auth);
+}
+
+// ─────────────────────────────────────────────
+// ROUTING
+// ─────────────────────────────────────────────
+function showLogin() {
+  hide('loader'); hide('app');
+  show('login-page');
+}
+
+function showDashboard(rol, uid) {
+  hide('loader'); hide('login-page');
+  $('app').style.display = 'block';
+  _currentRole = rol;
+  buildNav(rol);
+  updateUserUI();
+  if (rol === 'admin') loadAdminDash();
+  else if (rol === 'trabajador') loadWorkerDash(uid);
+  else loadClientDash(uid);
+}
+
+function buildNav(rol) {
+  const badge = $('role-badge');
+  const map = { admin:'badge-admin', trabajador:'badge-trabajador', cliente:'badge-cliente' };
+  const labels = { admin:'Administrador', trabajador:'Trabajador', cliente:'Cliente' };
+  badge.className = `role-badge ${map[rol]}`;
+  badge.textContent = labels[rol];
+
+  const navs = {
+    admin: [
+      { id:'admin-dash', label:'Dashboard', icon:'chart', page:'page-admin-dash' },
+      { id:'admin-usuarios', label:'Usuarios', icon:'users', page:'page-admin-usuarios' },
+      { id:'admin-proyectos', label:'Proyectos', icon:'folder', page:'page-admin-proyectos' },
+      { id:'admin-reportes', label:'Reportes', icon:'doc', page:'page-admin-reportes' },
+    ],
+    trabajador: [
+      { id:'worker-tareas', label:'Mis Tareas', icon:'task', page:'page-worker-tareas' },
+    ],
+    cliente: [
+      { id:'client-proyectos', label:'Mis Proyectos', icon:'folder', page:'page-client-proyectos' },
+    ]
+  };
+
+  const icons = {
+    chart:`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>`,
+    users:`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg>`,
+    folder:`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`,
+    doc:`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+    task:`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
+  };
+
+  const menu = $('nav-menu');
+  menu.innerHTML = '';
+  (navs[rol]||[]).forEach((n,i) => {
+    const el = document.createElement('div');
+    el.className = `nav-item${i===0?' active':''}`;
+    el.innerHTML = icons[n.icon] + `<span>${n.label}</span>`;
+    el.onclick = () => {
+      document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      $(n.page).classList.add('active');
+      if ($('sidebar').classList.contains('open')) toggleSidebar();
+      if (n.id==='admin-usuarios') loadAdminUsuarios();
+      if (n.id==='admin-proyectos') loadAdminProyectos();
+      if (n.id==='admin-reportes') loadAdminReportes();
+    };
+    menu.appendChild(el);
+  });
+
+  // Show first page
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  if (rol==='admin') $('page-admin-dash').classList.add('active');
+  else if (rol==='trabajador') $('page-worker-tareas').classList.add('active');
+  else $('page-client-proyectos').classList.add('active');
+}
+
+function updateUserUI() {
+  const u = window.__currentUser;
+  if (!u) return;
+  const name = u.nombre || u.correo || '?';
+  $('user-name-label').textContent = name;
+  $('user-email-label').textContent = u.correo || '';
+  $('user-avatar').textContent = name[0].toUpperCase();
+}
+
+function toggleSidebar() {
+  $('sidebar').classList.toggle('open');
+}
+
+// ─────────────────────────────────────────────
+// ADMIN – DASHBOARD
+// ─────────────────────────────────────────────
+async function loadAdminDash() {
+  const { db, collection, getDocs } = window.__fb;
+  const [pSnap, tSnap, uSnap, cSnap] = await Promise.all([
+    getDocs(collection(db,'proyectos')),
+    getDocs(collection(db,'tareas')),
+    getDocs(collection(db,'usuarios')),
+    getDocs(collection(db,'clientes')),
+  ]);
+
+  const tareas = tSnap.docs.map(d=>d.data());
+  const completadas = tareas.filter(t=>t.estado==='completada').length;
+  const enProgreso = tareas.filter(t=>t.estado==='en progreso').length;
+  const pendientes = tareas.filter(t=>t.estado==='pendiente').length;
+
+  $('admin-stats').innerHTML = `
+    <div class="stat-card stat-blue"><div class="stat-num">${pSnap.size}</div><div class="stat-label">Proyectos</div></div>
+    <div class="stat-card stat-green"><div class="stat-num">${completadas}</div><div class="stat-label">Tareas completadas</div></div>
+    <div class="stat-card stat-orange"><div class="stat-num">${enProgreso}</div><div class="stat-label">En progreso</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--muted)">${pendientes}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--accent2)">${uSnap.size}</div><div class="stat-label">Usuarios</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${cSnap.size}</div><div class="stat-label">Clientes</div></div>
+  `;
+
+  // Chart
+  const ctx = $('chart-tareas').getContext('2d');
+  if (_chartTareas) _chartTareas.destroy();
+  _chartTareas = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Completadas','En progreso','Pendientes'],
+      datasets:[{ data:[completadas,enProgreso,pendientes], backgroundColor:['#10b981','#f59e0b','#64748b'], borderWidth:0, hoverOffset:4 }]
+    },
+    options:{ plugins:{ legend:{ display:false } }, cutout:'70%', responsive:true, maintainAspectRatio:false }
+  });
+  $('chart-tareas-legend').innerHTML = `
+    <div class="pie-legend-item"><div class="pie-dot" style="background:#10b981"></div>Completadas (${completadas})</div>
+    <div class="pie-legend-item"><div class="pie-dot" style="background:#f59e0b"></div>En progreso (${enProgreso})</div>
+    <div class="pie-legend-item"><div class="pie-dot" style="background:#64748b"></div>Pendientes (${pendientes})</div>
+  `;
+
+  // Recent projects
+  const proyectos = pSnap.docs.slice(0,5);
+  $('dash-proyectos-list').innerHTML = proyectos.length ? proyectos.map(p=>{
+    const d = p.data();
+    const pTareas = tareas.filter(t=>t.proyecto_id===p.id);
+    const pComp = pTareas.filter(t=>t.estado==='completada').length;
+    const pct = pTareas.length ? Math.round(pComp/pTareas.length*100) : 0;
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:600;font-size:14px">${d.nombre}</span>
+        <span style="font-size:12px;color:var(--muted)">${pct}%</span>
+      </div>
+      ${progressBar(pct)}
+    </div>`;
+  }).join('') : '<div class="empty-state">Sin proyectos aún</div>';
+}
+
+// ─────────────────────────────────────────────
+// ADMIN – USUARIOS
+// ─────────────────────────────────────────────
+function loadAdminUsuarios() {
+  const { db, collection, onSnapshot } = window.__fb;
+  const q = collection(db,'usuarios');
+  _unsubs.push(onSnapshot(q, snap => {
+    const tbody = $('usuarios-tbody');
+    tbody.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      return `<tr>
+        <td><div style="font-weight:600">${u.nombre||'–'}</div></td>
+        <td style="color:var(--muted)">${u.correo||'–'}</td>
+        <td>${rolBadge(u.rol||'cliente')}</td>
+        <td>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="openRolModal('${d.id}','${u.rol||'cliente'}')">Cambiar rol</button>
+            <button class="btn btn-danger btn-sm" onclick="eliminarUsuario('${d.id}')">Eliminar</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:32px">Sin usuarios</td></tr>`;
+  }));
+}
+
+function openRolModal(uid, rolActual) {
+  $('rol-uid').value = uid;
+  $('rol-options').innerHTML = ['cliente','trabajador','admin'].map(rol => `
+    <div onclick="cambiarRol('${uid}','${rol}')" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;cursor:pointer;border:1px solid ${rol===rolActual?'var(--accent)':'var(--border)'};background:${rol===rolActual?'rgba(59,130,246,.1)':'transparent'};margin-bottom:8px;transition:all .2s">
+      ${rolBadge(rol)}
+      <span style="flex:1">${rol.charAt(0).toUpperCase()+rol.slice(1)}</span>
+      ${rol===rolActual?'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>':''}
+    </div>
+  `).join('');
+  openModal('modal-rol');
+}
+
+async function cambiarRol(uid, nuevoRol) {
+  const { db, doc, updateDoc } = window.__fb;
+  await updateDoc(doc(db,'usuarios',uid), { rol: nuevoRol });
+  closeModal('modal-rol');
+  notify('Rol actualizado');
+}
+
+async function eliminarUsuario(uid) {
+  if (!confirm('¿Eliminar este usuario del sistema?')) return;
+  const { db, doc, deleteDoc } = window.__fb;
+  await deleteDoc(doc(db,'usuarios',uid));
+  notify('Usuario eliminado');
+}
+
+// ─────────────────────────────────────────────
+// ADMIN – PROYECTOS
+// ─────────────────────────────────────────────
+function loadAdminProyectos() {
+  const { db, collection, onSnapshot, query, orderBy } = window.__fb;
+  _unsubs.push(onSnapshot(collection(db,'proyectos'), async snap => {
+    const container = $('proyectos-list');
+    if (snap.empty) { container.innerHTML = '<div class="empty-state">Sin proyectos. Crea el primero.</div>'; return; }
+
+    // Get tareas count per project
+    const tSnap = await window.__fb.getDocs(collection(db,'tareas'));
+    const tareas = tSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    container.innerHTML = snap.docs.map(p => {
+      const d = p.data();
+      const pTareas = tareas.filter(t=>t.proyecto_id===p.id);
+      const comp = pTareas.filter(t=>t.estado==='completada').length;
+      const pct = pTareas.length ? Math.round(comp/pTareas.length*100) : 0;
+      return `<div class="project-card" onclick="openProjectTasks('${p.id}','${d.nombre.replace(/'/g,"\\'")}')">
+        <div class="project-header">
+          <div>
+            <div class="project-name">${d.nombre}</div>
+            <div class="project-desc">${d.descripcion||''}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            ${estadoBadge(d.estado||'activo')}
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();editarProyecto('${p.id}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();eliminarProyecto('${p.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="progress-label"><span>${pTareas.length} tarea(s)</span><span>${pct}%</span></div>
+        ${progressBar(pct)}
+        <div class="project-footer">
+          <span style="font-size:12px;color:var(--muted)">${comp}/${pTareas.length} completadas</span>
+          <span style="font-size:12px;color:var(--accent)">Ver tareas →</span>
+        </div>
+      </div>`;
+    }).join('');
+  }));
+}
+
+async function openProjectTasks(pid, pnombre) {
+  const { db, collection, onSnapshot, query, where } = window.__fb;
+  $('mpt-pid').value = pid;
+  $('mpt-title').textContent = pnombre;
+  openModal('modal-project-tasks');
+  loadProjectTasks(pid);
+}
+
+function loadProjectTasks(pid) {
+  const { db, collection, query, where, onSnapshot } = window.__fb;
+  const q = query(collection(db,'tareas'), where('proyecto_id','==',pid));
+  onSnapshot(q, async snap => {
+    const tareas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const total = tareas.length;
+    const comp = tareas.filter(t=>t.estado==='completada').length;
+    const pct = total ? Math.round(comp/total*100) : 0;
+
+    $('mpt-progress').innerHTML = `
+      <div class="progress-label"><span>Progreso: ${comp}/${total} tareas</span><span>${pct}%</span></div>
+      ${progressBar(pct)}
+    `;
+
+    // Get workers
+    const wSnap = await window.__fb.getDocs(window.__fb.query(collection(db,'usuarios'), where('rol','==','trabajador')));
+    const workers = {};
+    wSnap.docs.forEach(d => workers[d.id] = d.data().nombre||d.data().correo);
+
+    const activas = tareas.filter(t=>t.estado!=='completada');
+    const completadas = tareas.filter(t=>t.estado==='completada');
+
+    $('mpt-body').innerHTML = (total===0 ? '<div class="empty-state">Sin tareas en este proyecto.</div>' : '') +
+      (activas.length ? `<div class="section-label">Pendientes / En progreso</div>` + activas.map(t=>taskCardAdmin(t, workers)).join('') : '') +
+      (completadas.length ? `<div class="section-label">Completadas</div>` + completadas.map(t=>taskCardAdmin(t, workers)).join('') : '');
+  });
+}
+
+function taskCardAdmin(t, workers) {
+  const done = t.estado==='completada';
+  return `<div class="task-card">
+    <div class="task-check ${done?'done':''}" onclick="toggleTarea('${t.id}','${t.proyecto_id}','${t.estado}')">
+      ${done?'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}
+    </div>
+    <div class="task-info">
+      <div class="task-name ${done?'done':''}">${t.nombre}</div>
+      <div class="task-meta">
+        ${prioBadge(t.prioridad||'media')}
+        ${estadoBadge(t.estado||'pendiente')}
+        <span style="font-size:12px;color:var(--muted)">${workers[t.trabajador_uid]||'Sin asignar'}</span>
+      </div>
+    </div>
+    <div class="task-actions">
+      <button class="btn btn-ghost btn-sm" onclick="editarTareaModal('${t.id}','${t.proyecto_id}')">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarTareaModal('${t.id}','${t.proyecto_id}')">🗑</button>
+    </div>
+  </div>`;
+}
+
+async function openNewTareaModal(pid, pname) {
+  $('modal-tarea-title').textContent = 'Nueva Tarea – '+pname;
+  $('tarea-edit-id').value = '';
+  $('tarea-proyecto-id').value = pid;
+  $('t-nombre').value = '';
+  $('t-prioridad').value = 'media';
+  $('t-estado').value = 'pendiente';
+  await loadTrabajadoresSelect();
+  openModal('modal-tarea');
+}
+
+async function editarTareaModal(tid, pid) {
+  const { db, doc, getDoc } = window.__fb;
+  const snap = await getDoc(doc(db,'tareas',tid));
+  const d = snap.data();
+  $('modal-tarea-title').textContent = 'Editar Tarea';
+  $('tarea-edit-id').value = tid;
+  $('tarea-proyecto-id').value = pid;
+  $('t-nombre').value = d.nombre||'';
+  $('t-prioridad').value = d.prioridad||'media';
+  $('t-estado').value = d.estado||'pendiente';
+  await loadTrabajadoresSelect(d.trabajador_uid);
+  openModal('modal-tarea');
+}
+
+async function loadTrabajadoresSelect(selected='') {
+  const { db, collection, query, where, getDocs } = window.__fb;
+  const snap = await getDocs(query(collection(db,'usuarios'), where('rol','==','trabajador')));
+  $('t-trabajador').innerHTML = '<option value="">Sin asignar</option>' +
+    snap.docs.map(d=>`<option value="${d.id}" ${d.id===selected?'selected':''}>${d.data().nombre||d.data().correo}</option>`).join('');
+}
+
+async function guardarTarea() {
+  const { db, collection, doc, addDoc, updateDoc, serverTimestamp } = window.__fb;
+  const nombre = $('t-nombre').value.trim();
+  if (!nombre) { notify('El nombre es requerido','error'); return; }
+  const tid = $('tarea-edit-id').value;
+  const pid = $('tarea-proyecto-id').value;
+  const data = {
+    nombre,
+    proyecto_id: pid,
+    prioridad: $('t-prioridad').value,
+    estado: $('t-estado').value,
+    trabajador_uid: $('t-trabajador').value,
+  };
+  if (tid) {
+    await updateDoc(doc(db,'tareas',tid), data);
+    notify('Tarea actualizada');
+  } else {
+    await addDoc(collection(db,'tareas'), data);
+    notify('Tarea creada');
+  }
+  await recalcProyecto(pid);
+  closeModal('modal-tarea');
+  loadProjectTasks(pid);
+}
+
+async function eliminarTareaModal(tid, pid) {
+  if (!confirm('¿Eliminar esta tarea?')) return;
+  const { db, doc, deleteDoc } = window.__fb;
+  await deleteDoc(doc(db,'tareas',tid));
+  await recalcProyecto(pid);
+  notify('Tarea eliminada');
+}
+
+async function toggleTarea(tid, pid, estadoActual) {
+  const { db, doc, updateDoc } = window.__fb;
+  const nuevo = estadoActual==='completada' ? 'pendiente' : 'completada';
+  await updateDoc(doc(db,'tareas',tid), { estado: nuevo });
+  await recalcProyecto(pid);
+}
+
+async function recalcProyecto(pid) {
+  const { db, collection, query, where, getDocs, doc, updateDoc } = window.__fb;
+  const snap = await getDocs(query(collection(db,'tareas'), where('proyecto_id','==',pid)));
+  const tareas = snap.docs.map(d=>d.data());
+  const total = tareas.length;
+  const comp = tareas.filter(t=>t.estado==='completada').length;
+  let estado = 'activo';
+  if (total>0 && comp===total) estado='completado';
+  else if (comp>0) estado='en progreso';
+  await updateDoc(doc(db,'proyectos',pid), { estado });
+}
+
+// Proyectos CRUD
+async function guardarProyecto() {
+  const { db, collection, doc, addDoc, updateDoc, serverTimestamp } = window.__fb;
+  const nombre = $('p-nombre').value.trim();
+  if (!nombre) { notify('El nombre es requerido','error'); return; }
+  const pid = $('proyecto-edit-id').value;
+  const data = {
+    nombre,
+    descripcion: $('p-desc').value.trim(),
+    cliente_id: $('p-cliente').value,
+    estado: $('p-estado').value,
+  };
+  if (pid) {
+    await updateDoc(doc(db,'proyectos',pid), data);
+    notify('Proyecto actualizado');
+  } else {
+    data.creadoEn = serverTimestamp();
+    await addDoc(collection(db,'proyectos'), data);
+    notify('Proyecto creado');
+  }
+  closeModal('modal-proyecto');
+}
+
+async function editarProyecto(pid) {
+  const { db, doc, getDoc, collection, getDocs } = window.__fb;
+  const snap = await getDoc(doc(db,'proyectos',pid));
+  const d = snap.data();
+  $('modal-proyecto-title').textContent = 'Editar Proyecto';
+  $('proyecto-edit-id').value = pid;
+  $('p-nombre').value = d.nombre||'';
+  $('p-desc').value = d.descripcion||'';
+  $('p-estado').value = d.estado||'activo';
+  await loadClientesSelect(d.cliente_id);
+  openModal('modal-proyecto');
+}
+
+async function loadClientesSelect(selected='') {
+  const { db, collection, getDocs } = window.__fb;
+  const snap = await getDocs(collection(db,'clientes'));
+  $('p-cliente').innerHTML = '<option value="">Sin asignar</option>' +
+    snap.docs.map(d=>`<option value="${d.id}" ${d.id===selected?'selected':''}>${d.data().nombre}</option>`).join('');
+}
+
+// On modal open for new project
+document.getElementById('modal-proyecto').addEventListener('click', e=>{
+  if (e.target===e.currentTarget) closeModal('modal-proyecto');
+});
+document.getElementById('modal-tarea').addEventListener('click', e=>{
+  if (e.target===e.currentTarget) closeModal('modal-tarea');
+});
+document.getElementById('modal-project-tasks').addEventListener('click', e=>{
+  if (e.target===e.currentTarget) closeModal('modal-project-tasks');
+});
+document.getElementById('modal-rol').addEventListener('click', e=>{
+  if (e.target===e.currentTarget) closeModal('modal-rol');
+});
+
+// Patch new proyecto button to load clientes
+document.querySelector('[onclick="openModal(\'modal-proyecto\')"]')?.addEventListener('click', async()=>{
+  $('modal-proyecto-title').textContent = 'Nuevo Proyecto';
+  $('proyecto-edit-id').value = '';
+  $('p-nombre').value = '';
+  $('p-desc').value = '';
+  $('p-estado').value = 'activo';
+  await loadClientesSelect();
+});
+
+async function eliminarProyecto(pid) {
+  if (!confirm('¿Eliminar este proyecto?')) return;
+  const { db, doc, deleteDoc } = window.__fb;
+  await deleteDoc(doc(db,'proyectos',pid));
+  notify('Proyecto eliminado');
+}
+
+// ─────────────────────────────────────────────
+// ADMIN – REPORTES
+// ─────────────────────────────────────────────
+async function loadAdminReportes() {
+  const { db, collection, getDocs, query, where } = window.__fb;
+  const [pSnap, cSnap] = await Promise.all([
+    getDocs(collection(db,'proyectos')),
+    getDocs(collection(db,'clientes')),
+  ]);
+  const clientes = {};
+  cSnap.docs.forEach(d => clientes[d.id] = d.data().nombre);
+
+  $('reportes-content').innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title">Reporte General</div>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Genera un PDF con todos los proyectos, tareas, trabajadores asignados y progreso.</p>
+      <button class="btn btn-primary btn-sm" onclick="generarReportePDF()">📄 Generar reporte general (PDF)</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Reporte por proyecto</div>
+      ${pSnap.docs.map(p=>{
+        const d = p.data();
+        const cn = clientes[d.cliente_id] || 'Sin cliente';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600">${d.nombre}</div>
+            <div style="font-size:12px;color:var(--muted)">Cliente: ${cn} · ${estadoBadge(d.estado||'activo')}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="generarReporteProyecto('${p.id}','${d.nombre.replace(/'/g,"\\'")}','${cn}')">📥 PDF</button>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+async function generarReportePDF() {
+  const { db, collection, getDocs, query, where } = window.__fb;
+  const [pSnap, tSnap, uSnap, cSnap] = await Promise.all([
+    getDocs(collection(db,'proyectos')),
+    getDocs(collection(db,'tareas')),
+    getDocs(collection(db,'usuarios')),
+    getDocs(collection(db,'clientes')),
+  ]);
+  const clientes = {}; cSnap.docs.forEach(d=>clientes[d.id]=d.data().nombre);
+  const workers = {}; uSnap.docs.forEach(d=>workers[d.id]=d.data().nombre||d.data().correo);
+  const tareas = tSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+  let html = `<html><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:40px;color:#1a1a2e}h1{color:#1e40af}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#1e40af;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:12px}.badge{padding:2px 8px;border-radius:12px;font-size:11px}.green{color:#065f46;background:#d1fae5}.orange{color:#92400e;background:#fef3c7}.grey{color:#4b5563;background:#f3f4f6}.proj-header{background:#eff6ff;padding:10px;border-radius:6px;margin:16px 0 8px}</style>
+  </head><body>
+  <h1>TechSolutions — Reporte General</h1>
+  <p style="color:#64748b">Generado: ${new Date().toLocaleString('es-GT')}</p>
+  <hr/>
+  <h2>Resumen</h2>
+  <table><tr><th>Proyectos</th><th>Total Tareas</th><th>Completadas</th><th>En Progreso</th><th>Pendientes</th></tr>
+  <tr><td>${pSnap.size}</td><td>${tareas.length}</td><td>${tareas.filter(t=>t.estado==='completada').length}</td><td>${tareas.filter(t=>t.estado==='en progreso').length}</td><td>${tareas.filter(t=>t.estado==='pendiente').length}</td></tr></table>
+  <h2>Detalle por Proyecto</h2>`;
+
+  pSnap.docs.forEach(p => {
+    const d = p.data();
+    const pt = tareas.filter(t=>t.proyecto_id===p.id);
+    const comp = pt.filter(t=>t.estado==='completada').length;
+    const pct = pt.length ? Math.round(comp/pt.length*100) : 0;
+    html += `<div class="proj-header"><strong>${d.nombre}</strong> — Cliente: ${clientes[d.cliente_id]||'Sin cliente'} — Estado: ${d.estado} — Progreso: ${pct}%</div>`;
+    if (pt.length) {
+      html += `<table><tr><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Trabajador</th></tr>`;
+      pt.forEach(t => {
+        const cls = t.estado==='completada'?'green':t.estado==='en progreso'?'orange':'grey';
+        html += `<tr><td>${t.nombre}</td><td><span class="badge ${cls}">${t.estado}</span></td><td>${t.prioridad||'media'}</td><td>${workers[t.trabajador_uid]||'Sin asignar'}</td></tr>`;
+      });
+      html += '</table>';
+    } else html += '<p style="color:#94a3b8;font-size:12px">Sin tareas</p>';
+  });
+
+  html += '</body></html>';
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+async function generarReporteProyecto(pid, pnombre, clienteNombre) {
+  const { db, collection, query, where, getDocs } = window.__fb;
+  const tSnap = await getDocs(query(collection(db,'tareas'), where('proyecto_id','==',pid)));
+  const uSnap = await getDocs(collection(db,'usuarios'));
+  const workers = {}; uSnap.docs.forEach(d=>workers[d.id]=d.data().nombre||d.data().correo);
+  const tareas = tSnap.docs.map(d=>({...d.data(),id:d.id}));
+  const comp = tareas.filter(t=>t.estado==='completada').length;
+  const pct = tareas.length ? Math.round(comp/tareas.length*100) : 0;
+
+  let html = `<html><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:40px;color:#1a1a2e}h1{color:#1e40af}table{width:100%;border-collapse:collapse}th{background:#1e40af;color:#fff;padding:8px;text-align:left;font-size:12px}td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:12px}.badge{padding:2px 8px;border-radius:12px;font-size:11px}.green{color:#065f46;background:#d1fae5}.orange{color:#92400e;background:#fef3c7}.grey{color:#4b5563;background:#f3f4f6}</style>
+  </head><body>
+  <h1>${pnombre}</h1>
+  <p><strong>Cliente:</strong> ${clienteNombre}</p>
+  <p><strong>Progreso:</strong> ${pct}% (${comp}/${tareas.length} tareas)</p>
+  <p style="color:#64748b">Generado: ${new Date().toLocaleString('es-GT')}</p><hr/>
+  <table><tr><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Trabajador</th></tr>
+  ${tareas.map(t=>{
+    const cls = t.estado==='completada'?'green':t.estado==='en progreso'?'orange':'grey';
+    return `<tr><td>${t.nombre}</td><td><span class="badge ${cls}">${t.estado}</span></td><td>${t.prioridad||'media'}</td><td>${workers[t.trabajador_uid]||'Sin asignar'}</td></tr>`;
+  }).join('')}
+  </table></body></html>`;
+
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+// ─────────────────────────────────────────────
+// TRABAJADOR
+// ─────────────────────────────────────────────
+function loadWorkerDash(uid) {
+  const { db, collection, query, where, onSnapshot } = window.__fb;
+  const q = query(collection(db,'tareas'), where('trabajador_uid','==',uid));
+  _unsubs.push(onSnapshot(q, snap => {
+    const tareas = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const activas = tareas.filter(t=>t.estado!=='completada');
+    const comp = tareas.filter(t=>t.estado==='completada');
+    const container = $('worker-tareas-list');
+
+    if (!tareas.length) {
+      container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><p>No tienes tareas asignadas aún.</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="stats-grid" style="margin-bottom:20px">
+        <div class="stat-card stat-orange"><div class="stat-num">${activas.length}</div><div class="stat-label">Pendientes</div></div>
+        <div class="stat-card stat-green"><div class="stat-num">${comp.length}</div><div class="stat-label">Completadas</div></div>
+      </div>
+      ${activas.length ? '<div class="section-label">Pendientes / En progreso</div>'+activas.map(t=>workerTaskCard(t)).join('') : ''}
+      ${comp.length ? '<div class="section-label">Completadas</div>'+comp.map(t=>workerTaskCard(t)).join('') : ''}
+    `;
+  }));
+}
+
+function workerTaskCard(t) {
+  const done = t.estado==='completada';
+  return `<div class="task-card">
+    <div class="task-check ${done?'done':''}" onclick="toggleTarea('${t.id}','${t.proyecto_id}','${t.estado}')">
+      ${done?'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}
+    </div>
+    <div class="task-info">
+      <div class="task-name ${done?'done':''}">${t.nombre}</div>
+      <div class="task-meta">
+        ${prioBadge(t.prioridad||'media')}
+        ${estadoBadge(t.estado||'pendiente')}
+      </div>
+    </div>
+    ${!done?`<button class="btn btn-success btn-sm" onclick="toggleTarea('${t.id}','${t.proyecto_id}','${t.estado}')">✓ Completar</button>`:'<span style="font-size:20px">✅</span>'}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+// CLIENTE
+// ─────────────────────────────────────────────
+async function loadClientDash(uid) {
+  const { db, doc, getDoc, collection, query, where, onSnapshot, getDocs } = window.__fb;
+  const container = $('client-proyectos-list');
+  container.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+
+  // Step 1: get the usuario doc to find cliente_id
+  let clienteId = '';
+  try {
+    const userSnap = await getDoc(doc(db,'usuarios',uid));
+    const userData = userSnap.data();
+    clienteId = userData?.cliente_id || '';
+    console.log('[Cliente] uid:', uid, '| cliente_id:', clienteId);
+  } catch(e) {
+    console.error('[Cliente] Error leyendo usuario:', e);
+  }
+
+  if (!clienteId) {
+    container.innerHTML = `<div class="empty-state">
+      <p>Tu cuenta no tiene un cliente_id asignado.</p>
+      <p style="font-size:12px;margin-top:8px;color:var(--muted)">Contacta al administrador.</p>
+    </div>`;
+    return;
+  }
+
+  // Step 2: simple direct query — no 'in', just ==
+  console.log('[Cliente] Buscando proyectos con cliente_id ==', clienteId);
+  const q = query(collection(db,'proyectos'), where('cliente_id','==', clienteId));
+  const unsub = onSnapshot(q, async snap => {
+    console.log('[Cliente] Proyectos encontrados:', snap.size);
+    if (snap.empty) {
+      container.innerHTML = `<div class="empty-state">
+        <p>No tienes proyectos asignados aún.</p>
+        <p style="font-size:12px;margin-top:8px;color:var(--muted)">cliente_id: ${clienteId}</p>
+      </div>`;
+      return;
+    }
+
+    const tSnap = await getDocs(collection(db,'tareas'));
+    const tareas = tSnap.docs.map(d=>({id:d.id,...d.data()}));
+    container.innerHTML = snap.docs.map(p => {
+      const d = p.data();
+      const pt = tareas.filter(t=>t.proyecto_id===p.id);
+      const comp = pt.filter(t=>t.estado==='completada').length;
+      const enProg = pt.filter(t=>t.estado==='en progreso').length;
+      const pend = pt.filter(t=>t.estado==='pendiente').length;
+      const pct = pt.length ? Math.round(comp/pt.length*100) : 0;
+
+      const taskRows = pt.map(t=>`
+        <div class="task-card" style="cursor:default">
+          <div class="task-check ${t.estado==='completada'?'done':''}" style="cursor:default">
+            ${t.estado==='completada'?'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}
+          </div>
+          <div class="task-info">
+            <div class="task-name ${t.estado==='completada'?'done':''}">${t.nombre}</div>
+            <div class="task-meta">${prioBadge(t.prioridad||'media')} ${estadoBadge(t.estado)}</div>
+          </div>
+        </div>`).join('');
+
+      return `<div class="client-project">
+        <div class="client-project-header" onclick="toggleClientProject('cp-${p.id}')">
+          <div>
+            <div style="font-weight:700;font-size:16px">${d.nombre}</div>
+            <div style="font-size:13px;color:var(--muted)">${d.descripcion||''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            ${estadoBadge(d.estado||'activo')}
+            <span style="color:var(--muted)">▼</span>
+          </div>
+        </div>
+        <div id="cp-${p.id}" style="display:none">
+          <div class="client-project-body">
+            <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+              <div class="stat-card stat-green" style="padding:14px"><div class="stat-num" style="font-size:22px">${comp}</div><div class="stat-label">Completadas</div></div>
+              <div class="stat-card stat-orange" style="padding:14px"><div class="stat-num" style="font-size:22px">${enProg}</div><div class="stat-label">En progreso</div></div>
+              <div class="stat-card" style="padding:14px"><div class="stat-num" style="font-size:22px;color:var(--muted)">${pend}</div><div class="stat-label">Pendientes</div></div>
+            </div>
+            <div class="progress-label"><span>Progreso general</span><span>${pct}%</span></div>
+            ${progressBar(pct)}
+            <div style="margin-top:20px">${taskRows||'<div class="empty-state">Sin tareas registradas.</div>'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }, err => {
+    console.error('[Cliente] Firestore error:', err.code, err.message);
+    container.innerHTML = `<div class="empty-state" style="border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:24px">
+      <p style="color:#fca5a5;font-weight:600">Error de permisos en Firestore</p>
+      <p style="font-size:12px;margin-top:8px;color:var(--muted)">${err.code}: ${err.message}</p>
+      <p style="font-size:12px;margin-top:12px;color:var(--muted)">Ve a Firebase Console → Firestore → Reglas y cambia a:<br/>
+      <code style="background:#1a2235;padding:4px 8px;border-radius:4px;display:block;margin-top:6px;text-align:left">allow read, write: if request.auth != null;</code></p>
+    </div>`;
+  });
+  _unsubs.push(unsub);
+}
+
+function toggleClientProject(id) {
+  const el = $(id);
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+setTimeout(() => { if ($('loader').style.display!=='none') $('loader').style.display='none'; }, 4000);
+
+// Patch nuevo proyecto btn
+document.addEventListener('click', async e => {
+  if (e.target.closest('[onclick="openModal(\'modal-proyecto\')"]')) {
+    $('modal-proyecto-title').textContent = 'Nuevo Proyecto';
+    $('proyecto-edit-id').value = '';
+    $('p-nombre').value = '';
+    $('p-desc').value = '';
+    $('p-estado').value = 'activo';
+    await loadClientesSelect();
+  }
+});
+</script>
+</body>
+</html>
